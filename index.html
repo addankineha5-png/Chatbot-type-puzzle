@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Mystical Tower - AI Puzzle Game</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 0;
+        }
+        
+        header {
+            background-color: #1e293b;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #334155;
+        }
+        
+        h1 {
+            color: #38bdf8;
+            margin: 0;
+            font-size: 2rem;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        
+        .game-intro {
+            background-color: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .game-area {
+            background-color: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        
+        .score {
+            text-align: right;
+            color: #38bdf8;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .chat-box {
+            height: 400px;
+            background-color: #0f172a;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        
+        .user-message {
+            color: #38bdf8;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .bot-message {
+            color: #e2e8f0;
+            margin-bottom: 10px;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            background-color: #334155;
+            border: none;
+            border-radius: 4px;
+            color: #e2e8f0;
+            font-family: monospace;
+        }
+        
+        button {
+            padding: 10px 15px;
+            background-color: #0284c7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background-color: #0369a1;
+        }
+        
+        button:disabled {
+            background-color: #475569;
+            cursor: not-allowed;
+        }
+        
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .suggestion {
+            background-color: #334155;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        
+        .suggestion:hover {
+            background-color: #0284c7;
+        }
+        
+        footer {
+            background-color: #1e293b;
+            text-align: center;
+            padding: 15px;
+            border-top: 2px solid #334155;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+        
+        .processing::after {
+            content: '';
+            display: inline-block;
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>The Mystical Tower</h1>
+        <p>An AI-Powered Puzzle Adventure</p>
+    </header>
+    
+    <div class="container">
+        <div class="game-intro" id="game-intro">
+            <h2>Welcome, Adventurer!</h2>
+            <p>Enter your name to begin your journey through The Mystical Tower:</p>
+            <div class="input-area">
+                <input type="text" id="player-name" placeholder="Your name">
+                <button id="start-button">Begin Adventure</button>
+            </div>
+        </div>
+        
+        <div class="game-area" id="game-area">
+            <div class="score">Score: <span id="score">0</span></div>
+            
+            <div class="chat-box" id="chat-box"></div>
+            
+            <div class="input-area">
+                <span style="color: #38bdf8; font-weight: bold;">&gt;</span>
+                <input type="text" id="command-input" placeholder="Enter your command...">
+                <button id="send-button">Send</button>
+            </div>
+            
+            <div class="suggestions" id="suggestions"></div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Created using Breadth-First Search, Bidirectional Search, and Simulated Annealing</p>
+    </footer>
+    
+    <script>
+        // Generate a random session ID
+        const sessionId = Math.random().toString(36).substring(2, 15);
+        let currentModule = 'general';
+        let isProcessing = false;
+        
+        // DOM elements
+        const gameIntro = document.getElementById('game-intro');
+        const gameArea = document.getElementById('game-area');
+        const playerNameInput = document.getElementById('player-name');
+        const startButton = document.getElementById('start-button');
+        const chatBox = document.getElementById('chat-box');
+        const commandInput = document.getElementById('command-input');
+        const sendButton = document.getElementById('send-button');
+        const scoreDisplay = document.getElementById('score');
+        const suggestionsArea = document.getElementById('suggestions');
+        
+        // Start the game
+        startButton.addEventListener('click', () => {
+            const playerName = playerNameInput.value.trim() || 'Adventurer';
+            
+            // Show loading state
+            startButton.disabled = true;
+            startButton.textContent = 'Starting...';
+            
+            // Start the game
+            fetch('/api/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    player_name: playerName
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide intro, show game area
+                gameIntro.style.display = 'none';
+                gameArea.style.display = 'block';
+                
+                // Add bot message
+                addMessage(data.message, 'bot');
+                
+                // Update score
+                scoreDisplay.textContent = data.score;
+                
+                // Update suggestions
+                updateSuggestions();
+                
+                // Focus on command input
+                commandInput.focus();
+            })
+            .catch(error => {
+                console.error('Error starting game:', error);
+                startButton.disabled = false;
+                startButton.textContent = 'Begin Adventure';
+                alert('Failed to start the game. Please try again.');
+            });
+        });
+        
+        // Send command
+        sendButton.addEventListener('click', sendCommand);
+        commandInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendCommand();
+            }
+        });
+        
+        function sendCommand() {
+            const command = commandInput.value.trim();
+            
+            if (!command || isProcessing) return;
+            
+            // Show processing state
+            isProcessing = true;
+            sendButton.disabled = true;
+            commandInput.disabled = true;
+            
+            // Add user message
+            addMessage(`> ${command}`, 'user');
+            
+            // Add processing indicator
+            const processingElement = document.createElement('div');
+            processingElement.className = 'bot-message processing';
+            processingElement.textContent = 'Processing';
+            chatBox.appendChild(processingElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            // Send command to server
+            fetch('/api/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    command: command
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remove processing indicator
+                chatBox.removeChild(processingElement);
+                
+                // Add bot message
+                addMessage(data.message, 'bot');
+                
+                // Update score
+                scoreDisplay.textContent = data.score;
+                
+                // Update current module based on command or response
+                if (command === '1' || command === 'library' || data.message.includes('Library of Whispers')) {
+                    currentModule = 'library';
+                } else if (command === '2' || command === 'maze' || data.message.includes('Ever-Changing Maze')) {
+                    currentModule = 'maze';
+                } else if (command === '3' || command === 'cipher' || data.message.includes('Forbidden Cipher')) {
+                    currentModule = 'cipher';
+                }
+                
+                // Update suggestions
+                updateSuggestions();
+                
+                // Reset input
+                commandInput.value = '';
+                commandInput.disabled = false;
+                sendButton.disabled = false;
+                isProcessing = false;
+                
+                // Focus on command input
+                commandInput.focus();
+            })
+            .catch(error => {
+                console.error('Error processing command:', error);
+                
+                // Remove processing indicator
+                chatBox.removeChild(processingElement);
+                
+                // Add error message
+                addMessage('Error processing command. Please try again.', 'bot');
+                
+                // Reset input state
+                commandInput.disabled = false;
+                sendButton.disabled = false;
+                isProcessing = false;
+            });
+        }
+        
+        function addMessage(text, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.className = sender === 'user' ? 'user-message' : 'bot-message';
+            messageElement.textContent = text;
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+        
+        function updateSuggestions() {
+            // Clear current suggestions
+            suggestionsArea.innerHTML = '';
+            
+            // Get suggestions based on current module
+            const suggestions = getCommandSuggestions();
+            
+            // Add suggestion buttons
+            suggestions.forEach(suggestion => {
+                const button = document.createElement('div');
+                button.className = 'suggestion';
+                button.textContent = suggestion;
+                button.addEventListener('click', () => {
+                    commandInput.value = suggestion;
+                    commandInput.focus();
+                });
+                suggestionsArea.appendChild(button);
+            });
+        }
+        
+        function getCommandSuggestions() {
+            const commonCommands = {
+                general: ['help', 'quit', 'score', 'debug'],
+                library: ['select The Guardian\'s Riddle', 'hint', 'puzzles'],
+                maze: ['select The Shifting Maze', 'config', 'puzzles'],
+                cipher: ['select The Alchemist\'s Challenge', 'rules', 'puzzles']
+            };
+            
+            const suggestions = [...commonCommands.general];
+            
+            if (currentModule !== 'general' && commonCommands[currentModule]) {
+                suggestions.push(...commonCommands[currentModule]);
+            }
+            
+            if (currentModule === 'general') {
+                suggestions.push('1', '2', '3');
+            }
+            
+            return suggestions;
+        }
+    </script>
+</body>
+</html>
